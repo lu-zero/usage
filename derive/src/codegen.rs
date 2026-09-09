@@ -6583,10 +6583,53 @@ fn subcommand_parts(cli: &Cli) -> Option<SubcommandParts> {
     })
 }
 
+/// Prototype: `fn any_non_default(&self) -> Option<(&'static str, String)>`,
+/// naming the first flag whose value differs from `Self::default()`.
+///
+/// Feasibility spike for a cross-field `#[usage(validate_with)]` invariant
+/// ("this whole mixin must stay default unless the selected command consumes
+/// it") that today needs a hand-written comparison per field to name which
+/// one actually differs. Renders via `Debug` — a real version would prefer
+/// `Display`/the field's own value-rendering where available.
+fn field_diff_method(cli: &Cli) -> TokenStream {
+    let struct_ident = &cli.ident;
+    let checks = cli.fields.iter().filter_map(|field| {
+        let Kind::Flag { longs, .. } = &field.kind else {
+            return None;
+        };
+        let field_ident = &field.ident;
+        let flag_name = format!(
+            "--{}",
+            longs.first().cloned().unwrap_or_else(|| field.name.clone())
+        );
+        Some(quote! {
+            if self.#field_ident != __usage_default.#field_ident {
+                return ::std::option::Option::Some((
+                    #flag_name,
+                    ::std::format!("{:?}", self.#field_ident),
+                ));
+            }
+        })
+    });
+    quote! {
+        impl #struct_ident {
+            pub fn any_non_default(&self) -> ::std::option::Option<(&'static str, ::std::string::String)>
+            where
+                Self: ::std::default::Default,
+            {
+                let __usage_default = <Self as ::std::default::Default>::default();
+                #(#checks)*
+                ::std::option::Option::None
+            }
+        }
+    }
+}
+
 /// A subcommand's argument struct: tables, metadata, and the trait that lets a
 /// parent reach them.
 pub fn emit_args(cli: &Cli) -> TokenStream {
     let ident = &cli.ident;
+    let field_diff_impl = cli.diff_from_default.then(|| field_diff_method(cli));
     let runtime = runtime_path();
     let dispatch = emit_command_dispatch(cli, &runtime);
     let validation = validation_path();
@@ -7326,6 +7369,8 @@ pub fn emit_args(cli: &Cli) -> TokenStream {
                     ::std::result::Result::Ok(#built_for_view)
                 }
             }
+
+            #field_diff_impl
         };
 
         #dispatch

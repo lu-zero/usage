@@ -183,6 +183,11 @@ pub struct Cli {
     pub disable_help_flag: bool,
     pub disable_help_subcommand: bool,
     pub disable_version_flag: bool,
+    /// Prototype opt-in for `any_non_default()`. Off by default: it requires
+    /// every flag field's type to implement `PartialEq`, which is not true
+    /// workspace-wide (confirmed by trying it unconditionally — breaks
+    /// unrelated structs whose fields lack it).
+    pub diff_from_default: bool,
     pub subcommand_help_heading: Option<String>,
     pub subcommand_value_name: Option<String>,
     pub next_line_help: bool,
@@ -842,6 +847,7 @@ impl Cli {
             disable_help_flag: false,
             disable_help_subcommand: false,
             disable_version_flag: false,
+            diff_from_default: false,
             subcommand_help_heading: None,
             subcommand_value_name: None,
             next_line_help: false,
@@ -1089,6 +1095,7 @@ impl Cli {
                     "disable_help_flag" => cli.disable_help_flag = flag_value(&meta)?,
                     "disable_help_subcommand" => cli.disable_help_subcommand = flag_value(&meta)?,
                     "disable_version_flag" => cli.disable_version_flag = flag_value(&meta)?,
+                    "diff_from_default" => cli.diff_from_default = flag_value(&meta)?,
                     "subcommand_help_heading" => {
                         cli.subcommand_help_heading = Some(string_value(&meta)?)
                     }
