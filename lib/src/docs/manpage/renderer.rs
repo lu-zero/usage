@@ -384,7 +384,7 @@ impl ManpageRenderer {
         for short in &flag.short {
             flag_parts.push(format!("-{}", short));
         }
-        for plus in &flag.plus_short {
+        if let Some(plus) = flag.plus_short {
             flag_parts.push(format!("+{}", plus));
         }
         for long in &flag.long {

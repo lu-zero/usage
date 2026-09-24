@@ -238,7 +238,7 @@ type Flag struct {
 	Name               string   `json:"name"`
 	Long               []string `json:"long"`
 	Short              []string `json:"short"`
-	PlusShort          []string `json:"plus_short"`
+	PlusShort          string   `json:"plus_short"`
 	HiddenAliases      []string `json:"hidden_aliases"`
 	HiddenShortAliases []string `json:"hidden_short_aliases"`
 	// Negate arrives with its dashes, as usage-lib stores it. The table wants the
@@ -327,8 +327,8 @@ func spelling(f *Flag) string {
 	if len(f.Short) > 0 && f.Short[0] != "" {
 		return "-" + f.Short[0]
 	}
-	if len(f.PlusShort) > 0 && f.PlusShort[0] != "" {
-		return "+" + f.PlusShort[0]
+	if f.PlusShort != "" {
+		return "+" + f.PlusShort
 	}
 	return ""
 }
@@ -989,7 +989,7 @@ func (b *builder) matchFlag(flags []*argv.Flag, name string, globalsOnly bool) (
 			}
 		}
 		if plus != 0 {
-			if slices.Contains(f.PlusShorts, plus) {
+			if f.PlusShort == plus {
 				return f.Key, true
 			}
 		}
@@ -1030,15 +1030,8 @@ func (b *builder) flag(f *Flag, strictDuplicates bool) *argv.Flag {
 		out.Delimiter = f.Arg.Delimiter[0]
 	}
 	b.recordNegation(out.Key, f.Negate)
-	for _, s := range f.PlusShort {
-		if s != "" {
-			out.PlusShorts = append(out.PlusShorts, s[0])
-		}
-	}
-	// A plus negation is a letter of its own, for plus bundles, not a long.
-	if len(f.Negate) == 2 && f.Negate[0] == '+' {
-		out.NegatePlus = f.Negate[1]
-		out.Negate = ""
+	if f.PlusShort != "" {
+		out.PlusShort = f.PlusShort[0]
 	}
 	for _, s := range f.Short {
 		if s != "" {

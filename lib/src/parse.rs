@@ -4880,7 +4880,7 @@ fn names_plus_spelling(flags: &BTreeMap<String, Arc<SpecFlag>>, token: &str) -> 
 /// a value that happens to look like one.
 fn flag_spells_plus(flag: &SpecFlag, token: &str) -> bool {
     token.chars().nth(1).is_some_and(|letter| {
-        flag.plus_short.contains(&letter) || flag.negate.as_deref() == Some(&format!("+{letter}"))
+        flag.plus_short == Some(letter) || flag.negate.as_deref() == Some(&format!("+{letter}"))
     })
 }
 

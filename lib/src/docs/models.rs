@@ -156,9 +156,9 @@ pub struct SpecFlag {
     pub admonitions: Vec<SpecAdmonition>,
     pub help_first_line: Option<String>,
     pub short: Vec<char>,
-    /// Short forms written with `+`, as the shells' `+o pipefail` is.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub plus_short: Vec<char>,
+    /// The short form written with `+`, as the shells' `+o pipefail` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plus_short: Option<char>,
     pub long: Vec<String>,
     pub required: bool,
     pub deprecated: Option<String>,
@@ -1062,7 +1062,7 @@ impl From<&crate::SpecFlag> for SpecFlag {
                 .filter(|short| !flag.hidden_short_aliases.contains(short))
                 .copied()
                 .collect(),
-            plus_short: flag.plus_short.clone(),
+            plus_short: flag.plus_short,
             long: flag
                 .long
                 .iter()

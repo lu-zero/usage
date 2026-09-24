@@ -661,9 +661,9 @@ pub enum Kind {
         /// Long aliases accepted by the parser but omitted from help and completion.
         hidden_longs: Vec<String>,
         shorts: Vec<char>,
-        /// Short forms written with `+` rather than `-`, as the shells' `+o pipefail`
+        /// The short form written with `+` rather than `-`, as the shells' `+o pipefail`
         /// is. A switch's `+x` that turns it off is `negate` instead.
-        plus_shorts: Vec<char>,
+        plus_short: Option<char>,
         negate: Option<String>,
         global: bool,
         /// One occurrence keeps taking values, as `--include <pattern>...` does in
@@ -1665,7 +1665,7 @@ impl Cli {
                 Kind::Flag {
                     longs,
                     shorts,
-                    plus_shorts,
+                    plus_short,
                     negate,
                     ..
                 } => {
@@ -1681,7 +1681,7 @@ impl Cli {
                             // A flag is named by any spelling it answers to, and for one
                             // spelled only with a `+` that is the only spelling there is.
                             Some(rest) => letter(rest).is_some_and(|plus| {
-                                plus_shorts.contains(&plus)
+                                *plus_short == Some(plus)
                                     || negate.as_deref() == Some(&format!("+{plus}"))
                             }),
                             None => selector
@@ -1758,7 +1758,7 @@ impl Cli {
                 Kind::Flag {
                     longs,
                     shorts,
-                    plus_shorts,
+                    plus_short,
                     negate,
                     ..
                 } => {
@@ -1792,7 +1792,7 @@ impl Cli {
                         }
                         seen_short.push((*short, field.span));
                     }
-                    for plus in plus_shorts.iter().copied().chain(negate_plus) {
+                    for plus in plus_short.iter().copied().chain(negate_plus) {
                         if let Some((_, first)) = seen_plus.iter().find(|(p, _)| *p == plus) {
                             return Err(dup(
                                 field.span,
@@ -2930,7 +2930,7 @@ impl Field {
         let mut bare_longs = 0usize;
         let mut shorts: Vec<char> = Vec::new();
         let mut bare_shorts = 0usize;
-        let mut plus_shorts: Vec<char> = Vec::new();
+        let mut plus_short: Option<char> = None;
         let mut negate = None;
         let mut global = false;
         let mut repeatable = false;
@@ -3050,7 +3050,16 @@ impl Field {
                         Meta::Path(_) => bare_shorts += 1,
                         _ => shorts.push(char_value(&meta)?),
                     },
-                    "plus_short" => plus_shorts.push(char_value(&meta)?),
+                    "plus_short" => {
+                        let letter = char_value(&meta)?;
+                        if plus_short.replace(letter).is_some() {
+                            return Err(syn::Error::new(
+                                span,
+                                "a flag has one plus spelling; the shells that spell \
+                                 options this way give each option one letter",
+                            ));
+                        }
+                    }
                     "negate" => negate = Some(strip_dashes(&string_value(&meta)?)),
                     "global" => global = flag_value(&meta)?,
                     "select" => select = flag_value(&meta)?,
@@ -3435,7 +3444,7 @@ impl Field {
         // A plus letter is matched a byte at a time inside a bundle, so a multi-byte one
         // could never be found, and the remainder after a value-taking letter would begin
         // in the middle of a character.
-        for plus in plus_shorts
+        for plus in plus_short
             .iter()
             .copied()
             .chain(negate_plus.into_iter().flat_map(str::chars))
@@ -3458,7 +3467,7 @@ impl Field {
         } = ValueKind::from_type(&field.ty, count, span)?;
         // A `+o` spelling makes a field a flag on its own, as a `-o` does: the shells'
         // `+o pipefail` has no dash form to pair with.
-        let is_flag = !longs.is_empty() || !shorts.is_empty() || !plus_shorts.is_empty();
+        let is_flag = !longs.is_empty() || !shorts.is_empty() || plus_short.is_some();
         if !is_flag && (trailing_var_arg || matches!(double_dash, DoubleDash::Required)) {
             if trailing_var_arg {
                 double_dash = DoubleDash::Automatic;
@@ -3992,7 +4001,7 @@ impl Field {
                 longs,
                 hidden_longs,
                 shorts,
-                plus_shorts,
+                plus_short,
                 negate,
                 global,
                 variadic,

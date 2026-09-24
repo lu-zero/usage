@@ -598,7 +598,7 @@ fn lint_flag(flag: &SpecFlag, cmd_path: &str, issues: &mut Vec<LintIssue>) {
     // negative one, which `reference_usage` already documents as legitimate.
     if flag.short.is_empty()
         && flag.long.is_empty()
-        && flag.plus_short.is_empty()
+        && flag.plus_short.is_none()
         && flag.negate.is_none()
     {
         issues.push(LintIssue {

@@ -17,7 +17,7 @@
 
 use crate::spec::{ArgMeta, CommandMeta, CommandSelector, FlagMeta, Spec, SpecView};
 pub use crate::spec::{Candidate, CandidateKind, CompleteCtx, Completer};
-use crate::{Arg, Command, Error, Flag, Parser};
+use crate::{negates_plus, Arg, Command, Error, Flag, Parser};
 use core::future::Future;
 use core::pin::Pin;
 use std::ffi::OsString;
@@ -2022,7 +2022,7 @@ fn plus_token(position: &Position<'_>, token: &str, sigil_claims_it: bool) -> bo
         position
             .flags
             .iter()
-            .any(|flag| flag.plus_shorts.contains(&letter) || flag.negate_plus == Some(letter))
+            .any(|flag| flag.plus_short == Some(letter) || negates_plus(flag, letter))
     };
     match token.strip_prefix('+') {
         None => false,
@@ -2030,10 +2030,9 @@ fn plus_token(position: &Position<'_>, token: &str, sigil_claims_it: bool) -> bo
         // likelier one, and a letter that names a flag still reaches it below.
         Some("") => {
             !sigil_claims_it
-                && position
-                    .flags
-                    .iter()
-                    .any(|flag| !flag.plus_shorts.is_empty() || flag.negate_plus.is_some())
+                && position.flags.iter().any(|flag| {
+                    flag.plus_short.is_some() || flag.negate.is_some_and(|n| n.starts_with('+'))
+                })
         }
         // The word is still being typed, so only the letters present can be asked about.
         Some(letters) => letters.bytes().all(names),
@@ -2089,7 +2088,11 @@ fn flag_forms<'a>(spec: &Spec<'a>, position: &Position<'_>, token: &str) -> Vec<
             }
         }
         if plus {
-            for &letter in flag.plus_shorts.iter().chain(flag.negate_plus.iter()) {
+            let negated = flag
+                .negate
+                .and_then(|n| n.strip_prefix('+'))
+                .and_then(|n| n.bytes().next());
+            for letter in flag.plus_short.into_iter().chain(negated) {
                 let asked_about = match wanted {
                     None => true,
                     Some(typed) => typed == letter,

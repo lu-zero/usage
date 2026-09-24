@@ -56,7 +56,7 @@ fn a_plus_spelling_negates_a_switch_and_names_a_flag_of_its_own() {
     // The derive names the flag after its field; a spec that writes only `flag "+o"` gets
     // `plus-o`, so that `-o` and `+o` stay two flags rather than one.
     let unset = spec.cmd.flags.iter().find(|f| f.name == "plus-o").unwrap();
-    assert_eq!(unset.plus_short, ['o']);
+    assert_eq!(unset.plus_short, Some('o'));
 
     let argv = ["-x", "-o", "errexit", "+o", "pipefail"];
     assert!(matches!(

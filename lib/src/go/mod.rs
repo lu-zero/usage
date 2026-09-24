@@ -997,7 +997,7 @@ fn match_flag(cmd: &Emitted, name: &str, globals_only: bool) -> Option<String> {
             return flag.long.iter().any(|l| l == long);
         }
         if let Some(plus) = plus {
-            return flag.plus_short.contains(&plus);
+            return flag.plus_short == Some(plus);
         }
         short.is_some_and(|c| flag.short.contains(&c))
     });
@@ -1564,33 +1564,18 @@ fn flag_literal(flag: &SpecFlag, named: &Named) -> String {
             .join(", ");
         fields.push(format!("HiddenShorts: []byte{{{shorts}}}"));
     }
-    if !flag.plus_short.is_empty() {
-        let shorts = flag
-            .plus_short
-            .iter()
-            .map(|c| go_byte(*c))
-            .collect::<Vec<_>>()
-            .join(", ");
-        fields.push(format!("PlusShorts: []byte{{{shorts}}}"));
+    if let Some(plus) = flag.plus_short {
+        fields.push(format!("PlusShort: {}", go_byte(plus)));
     }
-    match flag.negate.as_deref().and_then(|n| n.strip_prefix('+')) {
-        // A plus negation is a letter of its own, for plus bundles.
-        Some(letter) if letter.chars().count() == 1 => {
-            fields.push(format!(
-                "NegatePlus: {}",
-                go_byte(letter.chars().next().unwrap())
-            ));
-        }
-        _ => {
-            if let Some(negate) = &flag.negate {
-                // The spec stores the negation with its dashes; the table wants the bare
-                // name, since that is what the parser has after stripping the `--`.
-                fields.push(format!(
-                    "Negate: {}",
-                    go_string(negate.trim_start_matches('-'))
-                ));
-            }
-        }
+    if let Some(negate) = &flag.negate {
+        // The spec stores a long negation with its dashes and the table wants the bare
+        // name, since that is what the parser has after stripping the `--`. A `+x` is the
+        // whole spelling and keeps its sigil.
+        let negate = match negate.starts_with('+') {
+            true => negate.clone(),
+            false => negate.trim_start_matches('-').to_string(),
+        };
+        fields.push(format!("Negate: {}", go_string(&negate)));
     }
     if flag.arg.is_some() {
         fields.push("TakesValue: true".to_string());
@@ -1927,9 +1912,10 @@ bin "ex"
 flag "-x" negate="+x"
 flag "unset-option: +o <option>"
 "#);
-        assert!(out.contains("NegatePlus: 'x'"), "{out}");
-        assert!(out.contains("PlusShorts: []byte{'o'}"), "{out}");
-        assert!(!out.contains("Negate: \"+x\""), "{out}");
+        // The negation keeps its sigil and stays in `Negate`; only a primary `+o` gets a
+        // field, and it is one letter rather than a slice.
+        assert!(out.contains("Negate: \"+x\""), "{out}");
+        assert!(out.contains("PlusShort: 'o'"), "{out}");
     }
 
     /// mise declares both a `macos-defaults` command and a `macos defaults` path,

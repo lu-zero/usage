@@ -325,10 +325,11 @@ flag "-o <option>" var=#true                // -o pipefail
 flag "unset-option: +o <option>" var=#true  // +o pipefail
 ```
 
-Plus letters bundle as dash letters do: `+eux`. A plus spelling is one ASCII
-character, like a short. A flag spelled only with a `+` and given no name of its
-own is called `plus-o`, so that `-o` and `+o` stay two flags rather than one —
-name it, as the example above does, when it deserves a better one. See
+Plus letters bundle as dash letters do: `+eux`. A flag has one plus spelling, one
+ASCII character, as the shells that spell options this way give each option one.
+A flag spelled only with a `+` and given no name of its own is called `plus-o`,
+so that `-o` and `+o` stay two flags rather than one — name it, as the example
+above does, when it deserves a better one. See
 [the argv grammar](../argv.md#plus-spellings).
 
 ## `bool_value`

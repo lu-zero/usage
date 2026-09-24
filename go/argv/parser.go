@@ -622,16 +622,24 @@ func (p *Parser) step() bool {
 // not entered, so it cannot use the scope-walking findPlus.
 func defaultPlus(cmd *Command, b byte) (*Flag, bool) {
 	for _, f := range cmd.Flags {
-		if slices.Contains(f.PlusShorts, b) {
+		if f.PlusShort == b {
 			return f, false
 		}
 	}
 	for _, f := range cmd.Flags {
-		if f.NegatePlus == b {
+		if negatesPlus(f, b) {
 			return f, true
 		}
 	}
 	return nil, false
+}
+
+// negatesPlus reports whether b is the plus letter this flag's negation is spelled
+// with. The negation keeps its sigil in Negate rather than getting a field of its own:
+// `--no-color` and `+x` are both spellings that set the flag to false, and a `--` name
+// can never be read as a plus letter, so one field carries both without ambiguity.
+func negatesPlus(f *Flag, b byte) bool {
+	return len(f.Negate) == 2 && f.Negate[0] == '+' && f.Negate[1] == b
 }
 
 // isPlusBundle reports whether a token is a plus bundle this command would read as
@@ -642,7 +650,7 @@ func (p *Parser) isPlusBundle(token string) bool {
 }
 
 func (p *Parser) hasPlusSpellings() bool {
-	return p.eachInScope(func(f *Flag) bool { return len(f.PlusShorts) > 0 || f.NegatePlus != 0 }) != nil
+	return p.eachInScope(func(f *Flag) bool { return f.PlusShort != 0 || strings.HasPrefix(f.Negate, "+") }) != nil
 }
 
 // findPlus is the flag a plus letter names, and whether it is a switch's negation.
@@ -654,10 +662,10 @@ func (p *Parser) findPlus(b byte) (*Flag, bool) {
 			return f, negated
 		}
 	}
-	if f := p.eachInScope(func(f *Flag) bool { return slices.Contains(f.PlusShorts, b) }); f != nil {
+	if f := p.eachInScope(func(f *Flag) bool { return f.PlusShort == b }); f != nil {
 		return f, false
 	}
-	if f := p.eachInScope(func(f *Flag) bool { return f.NegatePlus == b }); f != nil {
+	if f := p.eachInScope(func(f *Flag) bool { return negatesPlus(f, b) }); f != nil {
 		return f, true
 	}
 	return nil, false

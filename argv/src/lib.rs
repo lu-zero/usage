@@ -423,13 +423,15 @@ pub struct Flag<'a> {
     /// it. Nothing is unsound if it does not: the value would simply be cut in a place that
     /// makes no sense, and on Windows would then fail to convert.
     pub shorts: &'a [u8],
-    /// Short forms written with `+` rather than `-`, as the shells' `+o pipefail` is.
-    /// They bundle as shorts do, in a token of their own: `+xo pipefail`.
-    pub plus_shorts: &'a [u8],
-    /// The `+x` that turns this switch off, as [`Self::negate`] is the long that does.
-    /// It bundles with other plus letters: `+eux`.
-    pub negate_plus: ::core::option::Option<u8>,
-    /// A long form that sets the flag to false, written without the `--`.
+    /// The short form written with `+` rather than `-`, as the shells' `+o pipefail` is.
+    /// It bundles as a short does, in a token of their own: `+xo pipefail`.
+    ///
+    /// One letter, not a list: a shell spells each option one way, and `Option<u8>` fits
+    /// in this struct's existing padding while a slice would add sixteen bytes to every
+    /// flag in every CLI, including the ones that never declare a plus spelling.
+    pub plus_short: ::core::option::Option<u8>,
+    /// A form that sets the flag to false, written without its dashes — or with its `+`,
+    /// which is how a switch spells the negation the shells give it: `set -x` / `set +x`.
     pub negate: Option<&'a str>,
     /// Whether the flag takes a value.
     pub takes_value: bool,
@@ -512,8 +514,7 @@ impl Flag<'_> {
         name: "",
         longs: &[],
         shorts: &[],
-        plus_shorts: &[],
-        negate_plus: ::core::option::Option::None,
+        plus_short: ::core::option::Option::None,
         negate: None,
         takes_value: false,
         variadic: false,
@@ -2517,7 +2518,7 @@ impl<'t: 'v, 'a, 'v> Parser<'t, 'a, 'v> {
 
     fn has_plus_spellings(&self) -> bool {
         self.in_scope()
-            .any(|f| !f.plus_shorts.is_empty() || f.negate_plus.is_some())
+            .any(|f| f.plus_short.is_some() || f.negate.is_some_and(|n| n.starts_with('+')))
     }
 
     /// The flag a plus letter names, and whether it is a switch's negation.
@@ -2530,11 +2531,11 @@ impl<'t: 'v, 'a, 'v> Parser<'t, 'a, 'v> {
             }
         }
         self.in_scope()
-            .find(|f| f.plus_shorts.contains(&byte))
+            .find(|f| f.plus_short == Some(byte))
             .map(|f| (f, false))
             .or_else(|| {
                 self.in_scope()
-                    .find(|f| f.negate_plus == Some(byte))
+                    .find(|f| negates_plus(f, byte))
                     .map(|f| (f, true))
             })
     }
@@ -3269,15 +3270,25 @@ fn default_plus<'t>(cmd: &'t Command<'t>, byte: u8) -> Option<(&'t Flag<'t>, boo
     cmd.flags
         .iter()
         .copied()
-        .find(|f| f.plus_shorts.contains(&byte))
+        .find(|f| f.plus_short == Some(byte))
         .map(|flag| (flag, false))
         .or_else(|| {
             cmd.flags
                 .iter()
                 .copied()
-                .find(|f| f.negate_plus == Some(byte))
+                .find(|f| negates_plus(f, byte))
                 .map(|flag| (flag, true))
         })
+}
+
+/// Whether `byte` is the plus letter this flag's negation is spelled with.
+///
+/// The negation keeps its sigil in [`Flag::negate`] rather than getting a field of its
+/// own: `--no-color` and `+x` are both spellings that set the flag to false, and a `--`
+/// name can never be read as a plus letter, so one field carries both without ambiguity.
+pub(crate) fn negates_plus(flag: &Flag<'_>, byte: u8) -> bool {
+    flag.negate
+        .is_some_and(|negate| negate.as_bytes() == [b'+', byte])
 }
 
 fn is_flag_like(token: &[u8]) -> bool {

@@ -2074,8 +2074,7 @@ fn diff_relaxing(
 fn diff_plus_scope(old: &SpecCommand, new: &SpecCommand, path: &str, c: &mut Changes) {
     let reads_plus = |cmd: &SpecCommand| {
         cmd.flags.iter().any(|flag| {
-            !flag.plus_short.is_empty()
-                || flag.negate.as_deref().is_some_and(|n| n.starts_with('+'))
+            flag.plus_short.is_some() || flag.negate.as_deref().is_some_and(|n| n.starts_with('+'))
         })
     };
     if !reads_plus(old) && reads_plus(new) {
@@ -2225,7 +2224,7 @@ fn primary_spelling(flag: &SpecFlag) -> String {
         .first()
         .map(|long| format!("--{long}"))
         .or_else(|| flag.short.first().map(|short| format!("-{short}")))
-        .or_else(|| flag.plus_short.first().map(|plus| format!("+{plus}")))
+        .or_else(|| flag.plus_short.map(|plus| format!("+{plus}")))
         .unwrap_or_else(|| flag.name.clone())
 }
 

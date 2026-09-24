@@ -153,12 +153,13 @@ type Flag struct {
 	// non-ASCII short can never be matched, and the remainder after a value-taking
 	// one — which becomes its value — would begin in the middle of a character.
 	Shorts []byte
-	// PlusShorts are short forms written with `+` rather than `-`, as the shells'
-	// `+o pipefail` is. They bundle as shorts do, in a token of their own.
-	PlusShorts []byte
-	// NegatePlus is the `+x` letter that turns this switch off, as Negate is the
-	// long that does. Zero means none. It bundles with other plus letters: `+eux`.
-	NegatePlus byte
+	// PlusShort is the short form written with `+` rather than `-`, as the shells'
+	// `+o pipefail` is. It bundles as a short does, in a token of their own. Zero
+	// means none.
+	//
+	// One letter, not a list: a shell spells each option one way, and this fits in
+	// the struct's existing padding while a slice would cost every flag in every CLI.
+	PlusShort byte
 	// HiddenShorts are accepted short aliases omitted from help and completion.
 	// Every entry also appears in Shorts.
 	HiddenShorts []byte

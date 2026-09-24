@@ -79,8 +79,13 @@ fn duplicate_flag_form(cmd: &Command<'_>) -> Option<std::string::String> {
         for short in flag.shorts {
             forms.push(std::format!("-{}", *short as char));
         }
-        for plus in flag.plus_shorts.iter().chain(flag.negate_plus.iter()) {
-            forms.push(std::format!("+{}", *plus as char));
+        for plus in flag
+            .plus_short
+            .iter()
+            .map(|plus| std::format!("+{}", *plus as char))
+            .chain(flag.negate.filter(|n| n.starts_with('+')).map(Into::into))
+        {
+            forms.push(plus);
         }
     }
     forms.sort_unstable();
@@ -2836,12 +2841,14 @@ fn write_flag(
         write!(out, " var_max={max}")?;
     }
     if let Some(negate) = meta.flag.negate {
-        // The spec writes the negation with its dashes; the table stores the bare
-        // name, since that is what a token is matched against.
-        write!(out, " negate={}", quoted(&format!("--{negate}")))?;
-    }
-    if let Some(plus) = meta.flag.negate_plus {
-        write!(out, " negate={}", quoted(&format!("+{}", plus as char)))?;
+        // The spec writes a long negation with its dashes; the table stores the bare
+        // name, since that is what a token is matched against. A `+x` keeps its sigil on
+        // both sides — it is the whole spelling, not a name under one.
+        let negate = match negate.starts_with('+') {
+            true => negate.to_string(),
+            false => format!("--{negate}"),
+        };
+        write!(out, " negate={}", quoted(&negate))?;
     }
     if let Some(heading) = meta.help_heading.or(inherited_heading) {
         write!(out, " help_heading={}", quoted(heading))?;
@@ -3603,7 +3610,7 @@ fn flag_forms(meta: &FlagMeta<'_>) -> String {
         forms.push('-');
         forms.push(*short as char);
     }
-    for plus in flag.plus_shorts {
+    for plus in flag.plus_short.iter() {
         if !forms.is_empty() {
             forms.push(' ');
         }

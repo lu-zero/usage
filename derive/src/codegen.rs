@@ -2237,7 +2237,7 @@ fn flag_table(i: usize, field: &Field) -> TokenStream {
         longs,
         hidden_longs: _,
         shorts,
-        plus_shorts,
+        plus_short,
         negate,
         global,
         variadic,
@@ -2246,17 +2246,16 @@ fn flag_table(i: usize, field: &Field) -> TokenStream {
         unreachable!("filtered by the caller");
     };
     let shorts: Vec<u8> = shorts.iter().map(|c| *c as u8).collect();
-    // A plus negation is a letter of its own, so that it bundles with other plus
-    // letters; only a long negation stays a name the long arm looks up.
-    let negate_plus = match negate.as_deref().and_then(|n| n.strip_prefix('+')) {
+    // A `+x` negation stays in `negate`, sigil and all: the table matches it as the
+    // spelling it is, and a `--` name can never be read as a plus letter.
+    let negate = option_str(negate.as_deref());
+    let plus_short = match plus_short {
         Some(letter) => {
-            let byte = letter.as_bytes()[0];
+            let byte = *letter as u8;
             quote!(::core::option::Option::Some(#byte))
         }
         None => quote!(::core::option::Option::None),
     };
-    let negate = option_str(negate.as_deref().filter(|n| !n.starts_with('+')));
-    let plus_shorts: Vec<u8> = plus_shorts.iter().map(|c| *c as u8).collect();
     let takes_value = field.takes_value();
     // The bound on one occurrence's values. A repeatable flag's bound counts occurrences
     // instead, which no single token can decide, so that one stays a post-binding check.
@@ -2319,8 +2318,7 @@ fn flag_table(i: usize, field: &Field) -> TokenStream {
             allow_negative_numbers: #allow_negative_numbers,
             value_terminator: #value_terminator,
             require_equals: #require_equals,
-            plus_shorts: &[#(#plus_shorts),*],
-            negate_plus: #negate_plus,
+            plus_short: #plus_short,
             value_optional: #value_optional,
             bool_value: #bool_value,
             default_missing: #default_missing,
@@ -3698,7 +3696,7 @@ fn view_field_active(field: &Field) -> TokenStream {
         longs,
         hidden_longs,
         shorts,
-        plus_shorts,
+        plus_short,
         negate,
         global: true,
         ..
@@ -3715,7 +3713,7 @@ fn view_field_active(field: &Field) -> TokenStream {
         .chain(negate.iter().filter(|negate| !negate.starts_with('+')))
         .map(|long| format!("--{long}"));
     let short_selectors = shorts.iter().map(|short| format!("-{short}"));
-    let plus_selectors = plus_shorts
+    let plus_selectors = plus_short
         .iter()
         .map(|plus| format!("+{plus}"))
         .chain(negate.iter().filter(|n| n.starts_with('+')).cloned());
@@ -3751,7 +3749,7 @@ fn field_active_in_view(field: &Field, view: &ViewDecl) -> bool {
         longs,
         hidden_longs,
         shorts,
-        plus_shorts,
+        plus_short,
         negate,
         global: true,
         ..
@@ -3766,7 +3764,7 @@ fn field_active_in_view(field: &Field, view: &ViewDecl) -> bool {
             .chain(negate.iter().filter(|negate| !negate.starts_with('+')))
             .map(|long| format!("--{long}"))
             .chain(shorts.iter().map(|short| format!("-{short}")))
-            .chain(plus_shorts.iter().map(|plus| format!("+{plus}")))
+            .chain(plus_short.iter().map(|plus| format!("+{plus}")))
             .chain(negate.iter().filter(|n| n.starts_with('+')).cloned())
             .any(|selector| view.globals.contains(&selector))
 }
@@ -4311,14 +4309,14 @@ fn field_selectors(field: &Field) -> Vec<String> {
         Kind::Flag {
             longs,
             shorts,
-            plus_shorts,
+            plus_short,
             negate,
             ..
         } => longs
             .iter()
             .map(|long| format!("--{long}"))
             .chain(shorts.iter().map(|short| format!("-{short}")))
-            .chain(plus_shorts.iter().map(|plus| format!("+{plus}")))
+            .chain(plus_short.iter().map(|plus| format!("+{plus}")))
             // A negation is a spelling of the same flag, and for a flag whose only form is
             // its negation it is the only one. `+x` is written as itself; a long takes the
             // dashes the model strips.
